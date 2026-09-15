@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TheManticoreProject/KeyCredentialHound/core/graph"
+	"github.com/TheManticoreProject/KeyCredentialHound/core/parse"
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
@@ -134,22 +136,17 @@ func main() {
 			os.Exit(1)
 		}
 
-		// og carries the collector's own nodes/edges and the source_kind.
-		og := gopengraph.NewOpenGraph(KindKeyCredentialBase)
-		// ogCrossCollector carries only the cross-collector edges to existing AD
-		// principals and must NOT set a source_kind, so those AD nodes are never
-		// stamped with this collector's kind (two-step upload).
-		ogCrossCollector := gopengraph.NewOpenGraph("")
+		c := parse.NewCollector(graph.SourceKindBase, debug)
 
-		ParseResults(ldapResults, og, ogCrossCollector, debug)
+		c.ParseResults(ldapResults)
 
-		if err := writeGraph(og, outputFile); err != nil {
+		if err := writeGraph(c.Graph.OG, outputFile); err != nil {
 			logger.Warn(err.Error())
 			os.Exit(1)
 		}
 
 		crossOutputFile := crossCollectorOutputFile(outputFile)
-		if err := writeGraph(ogCrossCollector, crossOutputFile); err != nil {
+		if err := writeGraph(c.CrossCollector.OG, crossOutputFile); err != nil {
 			logger.Warn(err.Error())
 			os.Exit(1)
 		}

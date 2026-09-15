@@ -93,26 +93,42 @@ def parse_args():
     bloodhound_group.add_argument("-H", "--host", type=str, default="127.0.0.1", help="BloodHound host")
     bloodhound_group.add_argument("-P", "--port", type=int, default=8080, help="BloodHound port")
     bloodhound_group.add_argument("-b", "--bearer", type=str, required=True, help="Bearer token for authentication")
-    
+    bloodhound_group.add_argument("-s", "--use-https", action="store_true", help="Use HTTPS instead of HTTP to reach BloodHound")
+    bloodhound_group.add_argument("-k", "--no-verify", action="store_true", help="Do not verify the TLS certificate of the BloodHound host")
+
     return parser.parse_args()
+
+
+# One entry per primary kind emitted by the collector. Keep in sync with kinds.go.
+#
+# Each algorithm gets its own glyph, and each visibility its own color: key
+# material in msDS-KeyCredentialLink is a public key blob, so a private key node
+# is a finding on its own and has to stand out at a glance.
+KINDS = [
+    ("KC_KeyCredential", "vault", "#8e44ad"),
+    ("KC_Device", "laptop", "#2980b9"),
+
+    ("KC_UnknownKeyMaterial", "question", "#7f8c8d"),
+
+    ("KC_RSAPublicKey", "key", "#16a085"),
+    ("KC_DSAPublicKey", "signature", "#16a085"),
+    ("KC_ECCPublicKey", "bezier-curve", "#16a085"),
+
+    ("KC_RSAPrivateKey", "key", "#c0392b"),
+    ("KC_DSAPrivateKey", "signature", "#c0392b"),
+    ("KC_ECCPrivateKey", "bezier-curve", "#c0392b"),
+]
+
+LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 
 if __name__ == "__main__":
     args = parse_args()
-    url = f"http://{args.host}:{args.port}"
 
-    kinds = [
-        ("KeyCredential", "vault", "#c3d1da"),
+    scheme = "https" if args.use_https else "http"
+    url = f"{scheme}://{args.host}:{args.port}"
 
-        ("KeyCredentialUnknownKeyMaterial", "key", "#dcd4e0"),
+    if not args.use_https and args.host not in LOOPBACK_HOSTS:
+        print(f"[!] Sending the bearer token in cleartext to {args.host}, use --use-https to protect it.")
 
-        ("KeyCredentialDSAPrivateKey", "key", "#ebded3"),
-        ("KeyCredentialRSAPrivateKey", "key", "#ebded3"),
-        ("KeyCredentialECCPrivateKey", "key", "#ebded3"),
-
-        ("KeyCredentialDSAPublicKey", "key", "#a1d7d7"),
-        ("KeyCredentialRSAPublicKey", "key", "#a1d7d7"),
-        ("KeyCredentialECCPublicKey", "key", "#a1d7d7")
-    ]
-
-    for kind, icon_name, icon_color in kinds:
-        update_icon(base_url=url, bearer=args.bearer, kind_name=kind, icon_name=icon_name, icon_color=icon_color, debug=args.debug)
+    for kind, icon_name, icon_color in KINDS:
+        update_icon(base_url=url, bearer=args.bearer, kind_name=kind, icon_name=icon_name, icon_color=icon_color, verify=(not args.no_verify), debug=args.debug)
